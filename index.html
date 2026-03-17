@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="id" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hisab MABIMS • Rukyat Digital</title>
+    
+    <!-- Leaflet CSS untuk Peta -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    
+    <!-- Font Awesome 6 (Gratis) untuk ikon modern -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&family=Amiri:ital@0;1&display=swap');
+        
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+        }
+        
+        .arabic-pattern {
+            background-color: #f8fafc;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cg fill-rule='evenodd'%3E%3Cg fill='%23e2e8f0' fill-opacity='0.4'%3E%3Cpath d='M0 38.59l2.83-2.83 1.41 1.41L1.41 40H0v-1.41zM0 1.4l2.83 2.83 1.41-1.41L1.41 0H0v1.41zM38.59 40l-2.83-2.83 1.41-1.41L40 38.59V40h-1.41zM40 1.41l-2.83 2.83-1.41-1.41L38.59 0H40v1.41zM20 18.6l2.83-2.83 1.41 1.41L21.41 20l2.83 2.83-1.41 1.41L20 21.41l-2.83 2.83-1.41-1.41L18.59 20l-2.83-2.83 1.41-1.41L20 18.59z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        }
+        
+        .dark .arabic-pattern {
+            background-color: #0f172a;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cg fill-rule='evenodd'%3E%3Cg fill='%23334155' fill-opacity='0.3'%3E%3Cpath d='M0 38.59l2.83-2.83 1.41 1.41L1.41 40H0v-1.41zM0 1.4l2.83 2.83 1.41-1.41L1.41 0H0v1.41zM38.59 40l-2.83-2.83 1.41-1.41L40 38.59V40h-1.41zM40 1.41l-2.83 2.83-1.41-1.41L38.59 0H40v1.41zM20 18.6l2.83-2.83 1.41 1.41L21.41 20l2.83 2.83-1.41 1.41L20 21.41l-2.83 2.83-1.41-1.41L18.59 20l-2.83-2.83 1.41-1.41L20 18.59z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        }
+
+        .result-card {
+            transition: all 0.3s ease;
+        }
+        .status-pass { border-left: 8px solid #059669; }
+        .status-fail { border-left: 8px solid #b91c1c; }
+        
+        .loading-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .5; }
+        }
+
+        /* Gradasi Islami modern (hijau-emas) */
+        @keyframes waveGradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .islamic-header {
+            background: linear-gradient(95deg, #0f4c3a, #1e6b4c, #b8860b, #2d6a4f);
+            background-size: 300% 300%;
+            animation: waveGradient 12s ease infinite;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .islamic-header::after {
+            content: "☾ ☽";
+            position: absolute;
+            bottom: 0;
+            right: 10px;
+            font-size: 60px;
+            opacity: 0.1;
+            color: white;
+            font-weight: bold;
+            line-height: 1;
+            transform: rotate(-10deg);
+            pointer-events: none;
+        }
+
+        /* Visualisasi Horison yang lebih estetik */
+        .sky-container {
+            position: relative;
+            height: 200px;
+            background: linear-gradient(145deg, #0b1f2e, #1d3a4e);
+            border-radius: 24px 24px 16px 16px;
+            overflow: hidden;
+            box-shadow: inset 0 -10px 20px rgba(0,0,0,0.5);
+            border: 1px solid #b8860b30;
+        }
+        .horizon-line {
+            position: absolute;
+            bottom: 60px;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, #fbbf24, #f59e0b, #d97706, transparent);
+            box-shadow: 0 0 15px #fbbf24;
+            z-index: 10;
+        }
+        .ground {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 60px;
+            background: linear-gradient(to top, #2d4a3b, #1f3b2c);
+            z-index: 5;
+            border-top: 2px solid #b8860b;
+        }
+        .star {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            opacity: 0.6;
+            animation: twinkle 3s infinite;
+        }
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+        #moonVisual {
+            position: absolute;
+            transition: all 1s ease-out;
+            filter: drop-shadow(0 0 12px #fef9c3);
+            z-index: 15;
+            font-size: 3.5rem;
+            transform-origin: center;
+        }
+
+        /* Filter Peta di Mode Gelap */
+        .dark .leaflet-layer,
+        .dark .leaflet-control-zoom-in,
+        .dark .leaflet-control-zoom-out,
+        .dark .leaflet-control-attribution {
+            filter: invert(1) hue-rotate(180deg) brightness(95%) contrast(90%);
+        }
+        
+        /* Input styling - DIPERBAIKI UNTUK MODE GELAP */
+        .input-islamic {
+            @apply w-full px-4 py-3 text-sm rounded-xl border outline-none backdrop-blur-sm transition;
+            background-color: white;
+            border-color: #d1fae5;
+            color: #0f172a;
+        }
+        .dark .input-islamic {
+            background-color: #1e293b !important;
+            border-color: #b8860b !important;
+            color: #f8fafc !important;
+        }
+        .dark .input-islamic::-webkit-calendar-picker-indicator {
+            filter: invert(1) brightness(100%) sepia(100%) hue-rotate(5deg);
+            cursor: pointer;
+            opacity: 0.8;
+        }
+        .dark .input-islamic::-webkit-datetime-edit-text,
+        .dark .input-islamic::-webkit-datetime-edit-month-field,
+        .dark .input-islamic::-webkit-datetime-edit-day-field,
+        .dark .input-islamic::-webkit-datetime-edit-year-field,
+        .dark .input-islamic::-webkit-datetime-edit-hour-field,
+        .dark .input-islamic::-webkit-datetime-edit-minute-field {
+            color: #f8fafc !important;
+        }
+        
+        /* Input khusus untuk time di dark mode */
+        .dark input[type="time"].input-islamic {
+            color-scheme: dark;
+        }
+        
+        /* Tombol emas */
+        .btn-gold {
+            background: linear-gradient(145deg, #b8860b, #d4a017);
+            @apply font-bold text-white shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] active:scale-[0.99];
+        }
+
+        /* Footer styling */
+        .footer-islamic {
+            background: linear-gradient(145deg, #0a3622, #1a4d2e);
+            border-top: 3px solid #b8860b;
+            position: relative;
+            overflow: hidden;
+        }
+        .footer-islamic::before {
+            content: "☾ ☽ ☾ ☽";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            font-size: 24px;
+            color: rgba(255, 215, 0, 0.1);
+            white-space: nowrap;
+            animation: slideFooter 20s linear infinite;
+        }
+        @keyframes slideFooter {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+        .dark .footer-islamic {
+            background: linear-gradient(145deg, #0f2a1a, #1a3822);
+        }
+    </style>
+</head>
+<body class="arabic-pattern min-h-screen text-slate-800 dark:text-slate-100 transition-colors duration-300 flex flex-col">
+
+    <!-- Theme Toggle Floating Button dengan ikon baru -->
+    <button onclick="toggleTheme()" class="fixed top-4 right-4 z-50 p-3 bg-white/30 dark:bg-slate-800/40 backdrop-blur-xl rounded-2xl border border-white/40 shadow-2xl hover:rotate-12 transition-all duration-300 focus:outline-none group">
+        <span id="themeIcon">
+            <i class="fas fa-sun text-2xl text-amber-300 block dark:hidden group-hover:scale-110 transition"></i>
+            <i class="fas fa-moon text-2xl text-indigo-200 hidden dark:block group-hover:scale-110 transition"></i>
+        </span>
+    </button>
+
+    <!-- Header dengan nuansa Islami dan ikon hilal -->
+    <header class="islamic-header sticky top-0 z-40 w-full shadow-2xl py-5 mb-8">
+        <div class="max-w-5xl mx-auto px-4 text-center relative">
+            <div class="flex items-center justify-center gap-3">
+                <i class="fas fa-crescent-star text-4xl text-yellow-300 drop-shadow-lg"></i>
+                <h1 class="text-2xl md:text-3xl font-black text-white tracking-wide drop-shadow-xl">Hisab • MABIMS</h1>
+                <i class="fas fa-star-and-crescent text-4xl text-yellow-300 drop-shadow-lg"></i>
+            </div>
+            <p class="text-xs md:text-sm text-amber-100 font-medium mt-1 bg-black/20 inline-block px-4 py-1 rounded-full backdrop-blur-sm">
+                <i class="fas fa-ruler-combined mr-1"></i> Kriteria Baru: 3° Ketinggian & 6,4° Elongasi
+            </p>
+        </div>
+    </header>
+
+    <div class="max-w-5xl mx-auto p-3 md:px-8 pb-10 flex-grow">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-7">
+            <!-- Input Section -->
+            <div class="space-y-5">
+                <!-- Data Waktu dengan ikon baru -->
+                <div class="bg-white/80 dark:bg-slate-800/90 p-5 md:p-6 rounded-3xl shadow-xl border border-emerald-100 dark:border-emerald-900 backdrop-blur-sm">
+                    <h2 class="text-lg font-bold mb-5 flex items-center dark:text-slate-100 text-emerald-700 dark:text-emerald-400">
+                        <i class="fas fa-clock ml-2 text-amber-600"></i>
+                        Waktu Pengamatan
+                    </h2>
+                    
+                    <div class="space-y-5">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2"><i class="fas fa-calendar-alt ml-1 text-amber-500"></i>  Tanggal</label>
+                            <input type="date" id="inputDate" class="input-islamic">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2"><i class="fas fa-clock ml-1 text-amber-500"></i>  Waktu Maghrib</label>
+                            <input type="time" id="inputTime" class="input-islamic">
+                            <p class="text-[11px] text-amber-600 dark:text-amber-400 mt-2 flex items-center gap-1"><i class="fas fa-sync-alt text-[10px]"></i> Otomatis mengikuti lokasi</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Lokasi Section dengan peta dan ikon baru -->
+                <div class="bg-white/80 dark:bg-slate-800/90 p-5 md:p-6 rounded-3xl shadow-xl border border-emerald-100 dark:border-emerald-900 backdrop-blur-sm">
+                    <h2 class="text-lg font-bold mb-5 flex items-center dark:text-slate-100 text-emerald-700 dark:text-emerald-400">
+                        <i class="fas fa-location-dot ml-2 text-amber-600"></i>
+                        Lokasi Pengamat
+                    </h2>
+                    <div class="space-y-4">
+                        <!-- Pencarian Kota dengan icon -->
+                        <div class="flex space-x-2">
+                            <div class="relative flex-1">
+                                <i class="fas fa-search absolute left-3 top-3 text-amber-500 text-xs"></i>
+                                <input type="text" id="cityInput" placeholder="Cari kota/daerah..." class="w-full text-sm bg-slate-50 dark:bg-slate-900 border border-emerald-200 dark:border-emerald-700 rounded-xl py-3 pl-9 pr-3 text-slate-800 dark:text-white focus:ring-2 focus:ring-amber-500 outline-none">
+                            </div>
+                            <button onclick="searchCity()" id="searchCityBtn" class="btn-gold px-5 py-2 rounded-xl text-sm whitespace-nowrap flex items-center gap-1">
+                                <i class="fas fa-magnifying-glass"></i> Cari
+                            </button>
+                        </div>
+
+                        <!-- Peta Interaktif lebih tinggi -->
+                        <div id="map" class="h-48 w-full rounded-2xl border-2 border-amber-300 dark:border-amber-700 z-10 relative shadow-inner"></div>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="text-[10px] uppercase text-slate-500 dark:text-slate-400 font-bold flex items-center gap-1"><i class="fas fa-arrow-up text-emerald-600"></i> Latitude</label>
+                                <input type="text" id="latInput" value="-6.20" class="w-full text-sm bg-slate-50 dark:bg-slate-900 border border-emerald-200 dark:border-emerald-700 rounded-xl p-3 font-mono text-indigo-700 dark:text-indigo-300">
+                            </div>
+                            <div>
+                                <label class="text-[10px] uppercase text-slate-500 dark:text-slate-400 font-bold flex items-center gap-1"><i class="fas fa-arrow-left text-emerald-600"></i> Longitude</label>
+                                <input type="text" id="lngInput" value="106.84" class="w-full text-sm bg-slate-50 dark:bg-slate-900 border border-emerald-200 dark:border-emerald-700 rounded-xl p-3 font-mono text-indigo-700 dark:text-indigo-300">
+                            </div>
+                        </div>
+                        
+                        <button onclick="detectLocation()" id="locBtn" class="w-full text-sm bg-emerald-50 dark:bg-emerald-900/30 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-emerald-800 dark:text-amber-300 font-semibold py-3 rounded-xl transition-all flex items-center justify-center gap-2 border border-emerald-200 dark:border-amber-800">
+                            <i class="fas fa-crosshairs text-amber-600"></i>
+                            Gunakan Lokasi Saya
+                        </button>
+                    </div>
+                </div>
+
+                <button onclick="hitungHilal()" class="w-full btn-gold py-4 rounded-xl text-lg shadow-2xl shadow-amber-500/30 flex items-center justify-center gap-2">
+                    <i class="fas fa-calculator"></i> Hitung Posisi Hilal
+                </button>
+            </div>
+
+            <!-- Output Section -->
+            <div class="md:col-span-2 space-y-5 md:space-y-7">
+                <!-- Visualisasi Box dengan langit & bintang -->
+                <div id="visualContainer" class="hidden space-y-2">
+                    <div class="sky-container relative">
+                        <!-- Bintang-bintang kecil -->
+                        <div class="star w-1 h-1 left-1/4 top-5"></div>
+                        <div class="star w-1.5 h-1.5 left-2/3 top-12"></div>
+                        <div class="star w-0.5 h-0.5 left-1/2 top-16"></div>
+                        <div class="star w-1 h-1 left-3/4 top-24"></div>
+                        <div class="star w-1 h-1 left-1/5 top-32"></div>
+                        <div class="horizon-line"></div>
+                        <div class="ground flex items-end justify-end p-2">
+                            <span class="text-[11px] font-bold text-amber-300 bg-black/30 px-3 py-1 rounded-full backdrop-blur-sm border border-amber-500/30">
+                                <i class="fas fa-arrow-right ml-1"></i> Barat
+                            </span>
+                        </div>
+                        <div id="moonVisual" class="text-5xl transition-all">🌙</div>
+                    </div>
+                    <p class="text-[11px] text-center text-emerald-600 dark:text-emerald-400 italic flex items-center justify-center gap-1">
+                        <i class="fas fa-eye"></i> Simulasi posisi hilal terhadap horison
+                    </p>
+                </div>
+
+                <div id="resultPlaceholder" class="bg-white/80 dark:bg-slate-800/90 p-12 md:p-16 rounded-3xl shadow-xl border-2 border-dashed border-amber-300 dark:border-amber-700 text-center backdrop-blur-sm">
+                    <i class="fas fa-moon text-6xl text-amber-400 mb-4 opacity-40"></i>
+                    <p class="text-slate-500 dark:text-slate-400 text-base italic">Masukkan data untuk melihat hasil simulasi</p>
+                </div>
+
+                <div id="resultContent" class="hidden space-y-5">
+                    <!-- Cards Grid dengan ikon -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div class="bg-white/90 dark:bg-slate-800/90 p-5 rounded-2xl shadow-lg border border-amber-100 dark:border-amber-900 text-center backdrop-blur-sm">
+                            <i class="fas fa-arrow-up text-3xl text-amber-500 mb-2"></i>
+                            <p class="text-[11px] text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Ketinggian Hilal</p>
+                            <p id="resAlt" class="text-2xl md:text-3xl font-black text-emerald-700 dark:text-emerald-400">0°</p>
+                        </div>
+                        <div class="bg-white/90 dark:bg-slate-800/90 p-5 rounded-2xl shadow-lg border border-amber-100 dark:border-amber-900 text-center backdrop-blur-sm">
+                            <i class="fas fa-expand-alt text-3xl text-amber-500 mb-2"></i>
+                            <p class="text-[11px] text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Elongasi</p>
+                            <p id="resElong" class="text-2xl md:text-3xl font-black text-emerald-700 dark:text-emerald-400">0°</p>
+                        </div>
+                        <div class="bg-white/90 dark:bg-slate-800/90 p-5 rounded-2xl shadow-lg border border-amber-100 dark:border-amber-900 text-center backdrop-blur-sm">
+                            <i class="fas fa-sun text-3xl text-amber-500 mb-2"></i>
+                            <p class="text-[11px] text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Fraksi Cahaya</p>
+                            <p id="resPhase" class="text-2xl md:text-3xl font-black text-emerald-700 dark:text-emerald-400">0%</p>
+                        </div>
+                    </div>
+
+                    <!-- MABIMS Analysis card modern -->
+                    <div id="statusCard" class="result-card bg-white/90 dark:bg-slate-800/90 p-6 rounded-2xl shadow-xl flex flex-col sm:flex-row items-center justify-between border border-amber-200 dark:border-amber-800 backdrop-blur-sm">
+                        <div class="mb-3 sm:mb-0 flex items-center gap-3">
+                            <i class="fas fa-clipboard-check text-3xl text-amber-600"></i>
+                            <div>
+                                <h3 class="text-lg font-bold dark:text-slate-100">Kriteria MABIMS</h3>
+                                <p id="statusDesc" class="text-xs text-slate-600 dark:text-slate-400 mt-1">Mengevaluasi data...</p>
+                            </div>
+                        </div>
+                        <div id="statusBadge" class="px-6 py-2 rounded-full font-black text-md shadow-inner flex items-center gap-1">
+                            <i class="fas fa-circle-exclamation"></i> DITOLAK
+                        </div>
+                    </div>
+
+                    <!-- Detail Data dalam bentuk card -->
+                    <div class="bg-white/90 dark:bg-slate-800/90 rounded-2xl shadow-xl overflow-hidden border border-amber-200 dark:border-amber-800 backdrop-blur-sm">
+                        <div class="bg-amber-50 dark:bg-amber-900/30 px-5 py-3 flex items-center gap-2">
+                            <i class="fas fa-table-list text-amber-700"></i>
+                            <span class="font-bold text-emerald-800 dark:text-amber-300">Detail Perhitungan</span>
+                        </div>
+                        <div class="p-4">
+                            <div class="flex justify-between items-center py-3 border-b border-amber-100 dark:border-amber-900">
+                                <span class="font-medium dark:text-slate-300"><i class="fas fa-arrow-up text-emerald-600 ml-2"></i> Tinggi Hilal (h)</span>
+                                <span class="font-mono font-bold text-xl text-indigo-600 dark:text-indigo-400" id="detAlt">0.00°</span>
+                                <span class="text-xs bg-slate-100 dark:bg-slate-700 px-3 py-1 rounded-full">Min. 3°</span>
+                            </div>
+                            <div class="flex justify-between items-center py-3">
+                                <span class="font-medium dark:text-slate-300"><i class="fas fa-arrows-left-right text-emerald-600 ml-2"></i> Elongasi (ε)</span>
+                                <span class="font-mono font-bold text-xl text-indigo-600 dark:text-indigo-400" id="detElong">0.00°</span>
+                                <span class="text-xs bg-slate-100 dark:bg-slate-700 px-3 py-1 rounded-full">Min. 6.4°</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer Baru -->
+    <footer class="footer-islamic w-full mt-8 py-6 px-4 text-center">
+        <div class="max-w-5xl mx-auto">
+            <div class="flex flex-col items-center justify-center gap-3">
+                <div class="flex items-center gap-3 text-amber-300">
+                    <i class="fas fa-star-and-crescent text-xl"></i>
+                    <span class="text-white/80 text-sm">© 2026, Hisab MABIMS</span>
+                    <i class="fas fa-star-and-crescent text-xl"></i>
+                </div>
+                <p class="text-amber-200/90 text-sm max-w-2xl leading-relaxed font-light italic">
+                    "Hisab ini untuk acuan awal dalam melakukan <span class="font-semibold text-white">Ru'yatul Hilal</span> 
+                    yang biasa dilakukan Menteri Agama Islam."
+                </p>
+                <div class="flex gap-2 mt-1">
+                    <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Toast dengan desain baru -->
+    <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 md:left-auto md:right-6 md:translate-x-0 hidden bg-emerald-900/90 dark:bg-amber-800/90 text-white px-7 py-4 rounded-2xl shadow-2xl text-sm z-[100] backdrop-blur-md border border-amber-400 items-center gap-3">
+        <i class="fas fa-bell text-amber-300"></i>
+        <span id="toastMessage"></span>
+    </div>
+
+    <!-- Leaflet & SunCalc -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/suncalc/1.9.0/suncalc.min.js"></script>
+
+    <script>
+        // Variabel Global untuk Peta
+        let map;
+        let mapMarker;
+
+        // Theme Management
+        function toggleTheme() {
+            const html = document.documentElement;
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+            } else {
+                html.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+            }
+        }
+
+        if (localStorage.getItem('theme') === 'dark') {
+            document.documentElement.classList.add('dark');
+        }
+
+        window.onload = () => {
+            const now = new Date();
+            document.getElementById('inputDate').value = now.toISOString().split('T')[0];
+            
+            initMap();
+            document.getElementById('inputDate').addEventListener('change', updateMaghrib);
+            
+            document.getElementById('latInput').addEventListener('change', () => {
+                const lat = parseFloat(document.getElementById('latInput').value);
+                const lng = parseFloat(document.getElementById('lngInput').value);
+                if(!isNaN(lat) && !isNaN(lng)) updateLocation(lat, lng, true);
+            });
+            
+            document.getElementById('lngInput').addEventListener('change', () => {
+                const lat = parseFloat(document.getElementById('latInput').value);
+                const lng = parseFloat(document.getElementById('lngInput').value);
+                if(!isNaN(lat) && !isNaN(lng)) updateLocation(lat, lng, true);
+            });
+
+            updateMaghrib();
+        }
+
+        // --- PETA & LOKASI ---
+        function initMap() {
+            const latInput = document.getElementById('latInput');
+            const lngInput = document.getElementById('lngInput');
+            let defLat = parseFloat(latInput.value) || -6.20;
+            let defLng = parseFloat(lngInput.value) || 106.84;
+            
+            map = L.map('map').setView([defLat, defLng], 5);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap'
+            }).addTo(map);
+
+            mapMarker = L.marker([defLat, defLng], {draggable: true}).addTo(map);
+
+            mapMarker.on('dragend', function(e) {
+                const pos = mapMarker.getLatLng();
+                updateLocation(pos.lat, pos.lng, false);
+            });
+
+            map.on('click', function(e) {
+                updateLocation(e.latlng.lat, e.latlng.lng, false);
+            });
+        }
+
+        function updateLocation(lat, lng, moveMap = true) {
+            document.getElementById('latInput').value = lat.toFixed(4);
+            document.getElementById('lngInput').value = lng.toFixed(4);
+            
+            if (mapMarker) {
+                mapMarker.setLatLng([lat, lng]);
+            }
+            if (map && moveMap) {
+                map.setView([lat, lng], 10);
+            }
+            updateMaghrib();
+        }
+
+        async function searchCity() {
+            const city = document.getElementById('cityInput').value;
+            const btn = document.getElementById('searchCityBtn');
+            if(!city) return;
+            
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-pulse"></i>';
+            btn.disabled = true;
+            
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(city)}`);
+                const data = await res.json();
+                
+                if(data && data.length > 0) {
+                    const lat = parseFloat(data[0].lat);
+                    const lng = parseFloat(data[0].lon);
+                    updateLocation(lat, lng, true);
+                    showToast(`📍 ${data[0].display_name.split(',')[0]}`);
+                } else {
+                    showToast("❌ Kota tidak ditemukan");
+                }
+            } catch (err) {
+                showToast("⚠️ Gagal mencari kota");
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        function detectLocation() {
+            const btn = document.getElementById('locBtn');
+            const originalText = btn.innerHTML;
+            if (!navigator.geolocation) {
+                showToast("Geolocation tidak didukung");
+                return;
+            }
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fas fa-spinner fa-pulse"></i> Mencari...`;
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    updateLocation(pos.coords.latitude, pos.coords.longitude, true);
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                    showToast("✅ Lokasi diperbarui!");
+                },
+                (err) => {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                    showToast("❌ Gagal: " + err.message);
+                }
+            );
+        }
+
+        // --- KALKULASI WAKTU MAGHRIB ---
+        function updateMaghrib() {
+            const dateVal = document.getElementById('inputDate').value;
+            const lat = parseFloat(document.getElementById('latInput').value);
+            const lng = parseFloat(document.getElementById('lngInput').value);
+            
+            if (dateVal && !isNaN(lat) && !isNaN(lng)) {
+                const [y, m, d] = dateVal.split('-');
+                const dateObj = new Date(y, m - 1, d, 12, 0, 0); 
+                
+                try {
+                    const times = SunCalc.getTimes(dateObj, lat, lng);
+                    if (times && times.sunset) {
+                        const sunset = times.sunset;
+                        const hh = String(sunset.getHours()).padStart(2, '0');
+                        const mm = String(sunset.getMinutes()).padStart(2, '0');
+                        document.getElementById('inputTime').value = `${hh}:${mm}`;
+                    }
+                } catch(e) {
+                    console.error("Gagal menghitung maghrib:", e);
+                }
+            }
+        }
+
+        // --- HISAB MABIMS (tidak berubah) ---
+        const RAD = Math.PI / 180;
+        const DEG = 180 / Math.PI;
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            document.getElementById('toastMessage').innerText = msg.replace(/[📍❌✅⚠️]/g,'');
+            t.classList.remove('hidden');
+            setTimeout(() => t.classList.add('hidden'), 3000);
+        }
+
+        function getJulianDate(date) {
+            return (date.getTime() / 86400000) + 2440587.5;
+        }
+
+        function calculateMoon(jd, lat, lng) {
+            const T = (jd - 2451545.0) / 36525;
+            const epsilon = (23.439291 - 0.0130042 * T) * RAD;
+
+            let L0 = 280.46646 + 36000.76983 * T;
+            let M = 357.52911 + 35999.05029 * T;
+            let lambdaSun = (L0 + 1.914666 * Math.sin(M * RAD) + 0.01999 * Math.sin(2 * M * RAD)) % 360;
+            
+            let LP = 218.316447 + 481267.881234 * T;
+            let D = 297.850192 + 445267.111403 * T;
+            let M_moon = 134.963396 + 477198.867505 * T;
+            let F = 93.272095 + 483202.017523 * T;
+
+            let lambdaMoon = (LP + 6.288774 * Math.sin(M_moon * RAD) + 1.274027 * Math.sin((2*D - M_moon) * RAD) + 0.658314 * Math.sin(2*D * RAD)) % 360;
+            let betaMoon = 5.128122 * Math.sin(F * RAD);
+            
+            let elongation = Math.acos(Math.cos(betaMoon * RAD) * Math.cos((lambdaMoon - lambdaSun) * RAD)) * DEG;
+            let illuminatedFraction = (1 - Math.cos(elongation * RAD)) / 2 * 100;
+
+            let raMoon = Math.atan2(Math.sin(lambdaMoon * RAD) * Math.cos(epsilon) - Math.tan(betaMoon * RAD) * Math.sin(epsilon), Math.cos(lambdaMoon * RAD)) * DEG;
+            let decMoon = Math.asin(Math.sin(betaMoon * RAD) * Math.cos(epsilon) + Math.cos(betaMoon * RAD) * Math.sin(epsilon) * Math.sin(lambdaMoon * RAD)) * DEG;
+
+            let d = jd - 2451545.0;
+            let GMST = (18.697374558 + 24.06570982441908 * d) % 24;
+            let LST = (GMST + lng / 15) % 24;
+            let H = (LST * 15 - raMoon);
+
+            let sinh = Math.sin(lat * RAD) * Math.sin(decMoon * RAD) + Math.cos(lat * RAD) * Math.cos(decMoon * RAD) * Math.cos(H * RAD);
+            let altitude = Math.asin(sinh) * DEG;
+
+            if (altitude > -2) {
+                let refraction = 1.02 / Math.tan((Math.max(0.1, altitude) + 10.3 / (Math.max(0.1, altitude) + 5.11)) * RAD) / 60;
+                altitude += refraction;
+            }
+
+            return { altitude, elongation, phase: illuminatedFraction };
+        }
+
+        function updateVisual(h) {
+            const moon = document.getElementById('moonVisual');
+            const container = document.getElementById('visualContainer');
+            container.classList.remove('hidden');
+
+            let pixelPos = 40 + (h * 8);
+            pixelPos = Math.max(10, Math.min(160, pixelPos));
+
+            moon.style.bottom = `${pixelPos}px`;
+            moon.style.left = `50%`;
+            moon.style.transform = `translateX(-50%) scale(${h < 0 ? 0.7 : 1})`;
+            moon.style.opacity = h < -5 ? '0.2' : '1';
+        }
+
+        function hitungHilal() {
+            const dateVal = document.getElementById('inputDate').value;
+            const timeVal = document.getElementById('inputTime').value;
+            const lat = parseFloat(document.getElementById('latInput').value);
+            const lng = parseFloat(document.getElementById('lngInput').value);
+
+            if (!dateVal || !timeVal || isNaN(lat) || isNaN(lng)) {
+                showToast("⚠️ Input tidak valid.");
+                return;
+            }
+
+            const targetDate = new Date(`${dateVal}T${timeVal}`);
+            const jd = getJulianDate(targetDate);
+            const data = calculateMoon(jd, lat, lng);
+
+            updateUI(data);
+            updateVisual(data.altitude);
+        }
+
+        function updateUI(data) {
+            document.getElementById('resultPlaceholder').classList.add('hidden');
+            document.getElementById('resultContent').classList.remove('hidden');
+
+            const h = data.altitude;
+            const e = data.elongation;
+            const p = data.phase;
+
+            document.getElementById('resAlt').innerText = h.toFixed(2) + "°";
+            document.getElementById('resElong').innerText = e.toFixed(2) + "°";
+            document.getElementById('resPhase').innerText = p.toFixed(2) + "%";
+            
+            document.getElementById('detAlt').innerText = h.toFixed(2) + "°";
+            document.getElementById('detElong').innerText = e.toFixed(2) + "°";
+
+            const statusCard = document.getElementById('statusCard');
+            const badge = document.getElementById('statusBadge');
+            const desc = document.getElementById('statusDesc');
+
+            if (h >= 3 && e >= 6.4) {
+                statusCard.className = "result-card bg-white/90 dark:bg-slate-800/90 p-6 rounded-2xl shadow-xl flex flex-col sm:flex-row items-center justify-between status-pass border border-amber-200 dark:border-amber-800 backdrop-blur-sm";
+                badge.className = "px-6 py-2 rounded-full font-black text-md bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 shadow-inner flex items-center gap-1";
+                badge.innerHTML = '<i class="fas fa-check-circle"></i> LOLOS';
+                desc.innerText = "Hilal mungkin terlihat (Imkanur Rukyat).";
+            } else {
+                statusCard.className = "result-card bg-white/90 dark:bg-slate-800/90 p-6 rounded-2xl shadow-xl flex flex-col sm:flex-row items-center justify-between status-fail border border-amber-200 dark:border-amber-800 backdrop-blur-sm";
+                badge.className = "px-6 py-2 rounded-full font-black text-md bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 shadow-inner flex items-center gap-1";
+                let alasan = [];
+                if (h < 3) alasan.push("Tinggi < 3°");
+                if (e < 6.4) alasan.push("Elongasi < 6.4°");
+                badge.innerHTML = '<i class="fas fa-times-circle"></i> DITOLAK';
+                desc.innerText = "Gagal: " + alasan.join(" & ");
+            }
+        }
+    </script>
+</body>
+</html>
